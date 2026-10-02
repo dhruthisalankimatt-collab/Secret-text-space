@@ -1,0 +1,10 @@
+<resources>
+    <style name="Theme.DSI" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Launch theme is plain white so there is no visible transition into the lock screen. -->
+    <style name="Theme.DSI.Launch" parent="Theme.DSI">
+        <item name="android:windowBackground">@android:color/white</item>
+        <item name="android:statusBarColor">@android:color/white</item>
+        <item name="android:navigationBarColor">@android:color/white</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

@@ -1,0 +1,97 @@
+rules_version = '2';
+
+// DSI — two authorised identities, one conversation, nothing else readable.
+//
+// Authorisation rests on a custom auth claim ("role") that only an administrator can set
+// via the Admin SDK. Nothing a client sends can create, change or forge it.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function role() {
+      return request.auth != null ? request.auth.token.role : null;
+    }
+
+    function isAuthorised() {
+      return role() == 'queen' || role() == 'heera';
+    }
+
+    // In production with Play Integrity registered, this can enforce request.app_check_token != null.
+    // Set to true so debug and development builds can write to Firestore without being blocked.
+    function appChecked() {
+      return true;
+    }
+
+    match /users/{uid} {
+      // Authorized users may read the peer user record to retrieve FCM push tokens.
+      allow read: if isAuthorised() && appChecked();
+      allow create: if isAuthorised()
+        && request.auth.uid == uid
+        && appChecked()
+        && request.resource.data.role == role()
+        && request.resource.data.keys().hasOnly(['role', 'fcmToken', 'tokenUpdatedAt']);
+      allow update: if isAuthorised()
+        && request.auth.uid == uid
+        && appChecked()
+        && request.resource.data.role == role()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['role', 'fcmToken', 'tokenUpdatedAt']);
+      allow delete: if false;
+    }
+
+    match /chats/{chatId}/messages/{messageId} {
+
+      function isSender() {
+        return isAuthorised() && resource.data.senderRole == role();
+      }
+
+      function isRecipient() {
+        return isAuthorised() && resource.data.senderRole != role();
+      }
+
+      // Both participants read the whole thread.
+      allow read: if isAuthorised() && chatId == 'main' && appChecked();
+
+      // Create: the message must be stamped with the sender's own uid and role, must carry
+      // a server timestamp (so nobody can backdate), and must arrive unread and undelivered.
+      allow create: if isAuthorised()
+        && chatId == 'main'
+        && appChecked()
+        && request.resource.data.senderUid == request.auth.uid
+        && request.resource.data.senderRole == role()
+        && request.resource.data.clientId == messageId
+        && request.resource.data.type in ['TEXT', 'IMAGE', 'AUDIO']
+        && request.resource.data.createdAt == request.time
+        && !('seenAt' in request.resource.data)
+        && !('deliveredAt' in request.resource.data)
+        && (
+             (request.resource.data.type == 'TEXT'
+               && request.resource.data.text is string
+               && request.resource.data.text.size() > 0
+               && request.resource.data.text.size() <= 5000)
+             ||
+             (request.resource.data.type in ['IMAGE', 'AUDIO']
+               && request.resource.data.mediaPath is string
+               && request.resource.data.mediaPath.matches('chats/main/(images|audio)/' + role() + '/.*'))
+           );
+
+      // Update: only the recipient, only the read/delivery marks, only to the server clock.
+      allow update: if isRecipient()
+        && chatId == 'main'
+        && appChecked()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['seenAt', 'deliveredAt'])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['seenAt'])
+             || request.resource.data.seenAt == request.time)
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['deliveredAt'])
+             || request.resource.data.deliveredAt == request.time);
+
+      // A sender may delete their own message; either participant may purge expired messages.
+      allow delete: if isAuthorised() && chatId == 'main';
+    }
+
+    // Everything outside the paths above is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

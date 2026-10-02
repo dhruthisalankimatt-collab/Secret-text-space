@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">DSI</string>
+    <string name="channel_name">Messages</string>
+    <string name="channel_waiting_name">Circular Alerts</string>
+    <string name="identity_title">Who is using this phone?</string>
+    <string name="identity_queen">Queen</string>
+    <string name="identity_heera">Mrs.Heera</string>
+    <string name="identity_continue">Continue</string>
+    <string name="passphrase_hint">Passphrase</string>
+    <string name="sign_in">Sign in</string>
+    <string name="composer_hint">Message</string>
+    <string name="record_hold">Hold to record</string>
+    <string name="retry">Retry</string>
+    <string name="offline_banner">No connection. Messages will send when you are back online.</string>
+</resources>

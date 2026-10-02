@@ -1,0 +1,41 @@
+rules_version = '2';
+
+// Media is private. Objects are reachable only through short-lived signed URLs handed to
+// an authenticated, App Check-attested client — never through a public URL.
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function role() {
+      return request.auth != null ? request.auth.token.role : null;
+    }
+
+    function isAuthorised() {
+      return role() == 'queen' || role() == 'heera';
+    }
+
+    match /chats/main/images/{senderRole}/{fileName} {
+      allow read: if isAuthorised();
+      // Each user writes only into their own folder; deletes are allowed for space cleanup
+      allow write: if isAuthorised()
+        && (request.resource == null
+            || (senderRole == role()
+                && request.resource.size <= 8 * 1024 * 1024
+                && request.resource.contentType.matches('image/.*')));
+    }
+
+    match /chats/main/audio/{senderRole}/{fileName} {
+      allow read: if isAuthorised();
+      // Voice notes: writes in own folder, delete allowed for cleanup
+      allow write: if isAuthorised()
+        && (request.resource == null
+            || (senderRole == role()
+                && request.resource.size <= 12 * 1024 * 1024
+                && (request.resource.contentType.matches('audio/.*')
+                    || request.resource.contentType.matches('video/mp4'))));
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

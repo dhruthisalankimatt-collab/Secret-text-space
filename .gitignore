@@ -1,0 +1,16 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+/build
+/app/build
+/captures
+.externalNativeBuild
+.cxx
+app/google-services.json
+firebase/functions/node_modules
+scripts/node_modules
+scripts/service-account.json
+*.keystore
+*.jks
+app/src/main/res/raw/service_account.json
